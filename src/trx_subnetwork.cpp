@@ -12,9 +12,9 @@
 // Arguments:
 // - data: A data which will be sent.
 void TrxSubNetwork::SendByte(const uint8_t data) {
-		// TODO Note that currently I keep temporary variable in order to convert and
-		// pass to write function for now this is OK. As soon as we change serial port
-		// to VHF we should modify current function.
+  // TODO Note that currently I keep temporary variable in order to convert and
+  // pass to write function for now this is OK. As soon as we change serial port
+  // to VHF we should modify current function.
   const char byte = (char)data;
   serial_stream.write(&byte, 1);
 
@@ -211,7 +211,6 @@ void TrxSubNetwork::Distribute() {
   char byte = 0;
   while (true) {
     try {
-
       idx = 0;
       byte = 0;
       while (input_file >> byte && idx < FRAME_LENGTH) {
