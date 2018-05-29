@@ -18,11 +18,6 @@ using namespace LibSerial;
 // followed by the original data octet with bit 5 inverted.
 #define INVERT_OCTET 0x20
 
-// The frame check sequence (FCS) is a 16-bit CRC-CCITT.
-// AVR Libc CRC function is _crc_ccitt_update().
-// TODO we may use something different.
-#define CRC16_CCITT_INIT_VAL 0xFFFF
-
 // 16 bit low and high bytes copier.
 #define low(x)  ((x) & 0xFF)
 #define high(x) (((x)>>8) & 0xFF)
@@ -35,7 +30,6 @@ struct TrxSubNetwork {
 
   bool escape_character_;
   uint16_t frame_position_;
-  uint16_t frame_checksum_;   // 16 bit CRC sum for crc_ccitt_update.
   uint16_t frame_length_;
   uint8_t* received_frame_buffer_;
 
@@ -55,7 +49,6 @@ struct TrxSubNetwork {
                 const int baud_rate = 115200) :
       escape_character_(false),
       frame_position_(0),
-      frame_checksum_(CRC16_CCITT_INIT_VAL),
       frame_length_(frame_length),
       received_frame_buffer_(new uint8_t[frame_length_ + 1]) {
 
@@ -99,6 +92,16 @@ struct TrxSubNetwork {
   // - frame_length: A length of frame.
   void HandleFrameData(const uint8_t* frame_data, const uint16_t frame_length);
 
+  // Network device allocation.
+  //
+  // Arguments:
+  // - dev: It should be the name of the device with a format string. (e.g. "tun%d").
+  //        Note that the character pointer becomes overwritten with the real device
+  //        name (e.g. "tun0").
+  //
+  // Return the file descriptor of the new tun device.
+  int TunAlloc(char* dev);
+
   // Function is running as a separate thread of process and it is always listening
   // serial port, any received data passes to ParseByteData() function.
   void Listen();
@@ -111,9 +114,6 @@ struct TrxSubNetwork {
   // The main function which runs Listen() and Distribute() functions as a separate
   // threads or asynchronous.
   void Run();
-
-  // TODO we may change this to get better error detector.
-  uint16_t crc_ccitt_update(const uint16_t crc, uint8_t data);
 };
 
 #endif

@@ -12,9 +12,9 @@
 // Arguments:
 // - data: A data which will be sent.
 void TrxSubNetwork::SendByte(const uint8_t data) {
-		// TODO Note that currently I keep temporary variable in order to convert and
-		// pass to write function for now this is OK. As soon as we change serial port
-		// to VHF we should modify current function.
+  // TODO Note that currently I keep temporary variable in order to convert and
+  // pass to write function for now this is OK. As soon as we change serial port
+  // to VHF we should modify current function.
   const char byte = (char)data;
   serial_stream.write(&byte, 1);
 
@@ -37,17 +37,11 @@ void TrxSubNetwork::ParseByteData(uint8_t data) {
     if (escape_character_ == true) {
       escape_character_ = false;
     } else { // If a valid frame is detected.
-      const int msb = (received_frame_buffer_[frame_position_ - 1] << 8);
-      const int lsb = (received_frame_buffer_[frame_position_ - 2] & 0xff);
-      // (msb << 8 ) | (lsb & 0xff)
-      // TODO I am not sure, but I think I have a bug here as this never happens.
-      // It may be because of crc_ccitt_update() function.
-      if (frame_position_ >= 2 && frame_checksum_ == (msb | (lsb))) {
+      if (frame_position_ >= 2) {
         HandleFrameData(received_frame_buffer_, frame_position_ - 2);
       }
 
       frame_position_ = 0;
-      frame_checksum_ = CRC16_CCITT_INIT_VAL;
       return;
     }
   }
@@ -61,33 +55,12 @@ void TrxSubNetwork::ParseByteData(uint8_t data) {
   }
 
   received_frame_buffer_[frame_position_] = data;
-
-  if (frame_position_ - 2 >= 0) {
-    frame_checksum_ = crc_ccitt_update(frame_checksum_, received_frame_buffer_[frame_position_ - 2]);
-  }
-
   frame_position_++;
 
   if (frame_position_ == frame_length_) {
     HandleFrameData(received_frame_buffer_, frame_length_);
-
     frame_position_ = 0;
-    frame_checksum_ = CRC16_CCITT_INIT_VAL;
   }
-}
-
-
-
-// The following is the equivalent functionality written in C.
-uint16_t TrxSubNetwork::crc_ccitt_update(const uint16_t crc, uint8_t data) {
-
-  data ^= (crc & 255);
-  data ^= data << 4;
-
-  const uint16_t value = ((((uint16_t)data << 8) | (crc >> 8)) ^
-                          (uint8_t)(data >> 4)  ^
-                          ((uint16_t)data << 3));
-  return value;
 }
 
 
@@ -108,14 +81,12 @@ void TrxSubNetwork::FrameEncodeToHdlcAndSend(const uint8_t* frame_buffer,
   }
 
   uint8_t data = 0;
-  uint16_t fcs = CRC16_CCITT_INIT_VAL;
 
   SendByte((uint8_t)FRAME_BOUNDARY_FLAG);
 
   while (frame_length) {
     data = *frame_buffer;
     frame_buffer++;
-    fcs = crc_ccitt_update(fcs, data);
     if ((data == CONTROL_ESCAPE_OCTET) || (data == FRAME_BOUNDARY_FLAG)) {
       SendByte((uint8_t)CONTROL_ESCAPE_OCTET);
       data ^= (uint8_t)INVERT_OCTET;
@@ -125,14 +96,12 @@ void TrxSubNetwork::FrameEncodeToHdlcAndSend(const uint8_t* frame_buffer,
     frame_length--;
   }
 
-  data = low(fcs);
   if ((data == CONTROL_ESCAPE_OCTET) || (data == FRAME_BOUNDARY_FLAG)) {
     SendByte((uint8_t)CONTROL_ESCAPE_OCTET);
     data ^= (uint8_t)INVERT_OCTET;
   }
   SendByte(data);
 
-  data = high(fcs);
   if ((data == CONTROL_ESCAPE_OCTET) || (data == FRAME_BOUNDARY_FLAG)) {
     SendByte((uint8_t)CONTROL_ESCAPE_OCTET);
     data ^= (uint8_t)INVERT_OCTET;
@@ -162,6 +131,20 @@ void TrxSubNetwork::HandleFrameData(const uint8_t* frame_data,
     }
   }
   std::cout << "\n";
+}
+
+
+
+// Network device allocation.
+//
+// Arguments:
+// - dev: It should be the name of the device with a format string. (e.g. "tun%d").
+//        Note that the character pointer becomes overwritten with the real device
+//        name (e.g. "tun0").
+//
+// Return the file descriptor of the new tun device.
+int TrxSubNetwork::TunAlloc(char* dev) {
+  return 0;
 }
 
 
