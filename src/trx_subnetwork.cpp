@@ -32,35 +32,60 @@ void TrxSubNetwork::SendByte(const uint8_t data) {
 // Arguments:
 // - data: Received byte data from serial port.
 void TrxSubNetwork::ParseByteData(uint8_t data) {
-  // FRAME FLAG
-  if (data == FRAME_BOUNDARY_FLAG) {
-    if (escape_character_ == true) {
-      escape_character_ = false;
-    } else { // If a valid frame is detected.
-      if (frame_position_ >= 2) {
-        HandleFrameData(received_frame_buffer_, frame_position_ - 2);
-      }
 
-      frame_position_ = 0;
-      return;
-    }
+  HdlcState next_state = HdlcState::START;
+
+  switch (current_state_) {
+    case HdlcState::START:
+         if (data == FRAME_BOUNDARY_FLAG)
+           next_state = HdlcState::FRAME;
+         else
+           next_state = HdlcState::START;
+    break;
+
+    case HdlcState::FRAME:
+         if (data != FRAME_BOUNDARY_FLAG && data != CONTROL_ESCAPE_OCTET) {
+           if (frame_position_ < MAX_FRAME_LENGTH) {
+             received_frame_buffer_[frame_position_] = data;
+             frame_position_++;
+             next_state = HdlcState::FRAME;
+           } else {
+             frame_position_ = 0;
+             next_state = HdlcState::START;
+           }
+         } else if (data == FRAME_BOUNDARY_FLAG) {
+           if (frame_position_ < MAX_FRAME_LENGTH && frame_position_ > 0) {
+             HandleFrameData(received_frame_buffer_, frame_position_);
+           }
+           frame_position_ = 0;
+           next_state = HdlcState::START;
+         } else if (data == CONTROL_ESCAPE_OCTET) {
+           next_state = HdlcState::ESCAPE;
+         }
+    break;
+
+    case HdlcState::ESCAPE:
+         data ^= INVERT_OCTET;
+         if (data == CONTROL_ESCAPE_OCTET || data == FRAME_BOUNDARY_FLAG) {
+           if (frame_position_ < MAX_FRAME_LENGTH) {
+             received_frame_buffer_[frame_position_] = data;
+             frame_position_++;
+             next_state = HdlcState::FRAME;
+           } else {
+             frame_position_ = 0;
+             next_state = HdlcState::START;
+           }
+         } else {
+           frame_position_ = 0;
+           next_state = HdlcState::START;
+         }
+    break;
+
+    default:
+      current_state_ = HdlcState::START;
   }
 
-  if (escape_character_) {
-    escape_character_ = false;
-    data ^= INVERT_OCTET;
-  } else if (data == CONTROL_ESCAPE_OCTET) {
-    escape_character_ = true;
-    return;
-  }
-
-  received_frame_buffer_[frame_position_] = data;
-  frame_position_++;
-
-  if (frame_position_ == frame_length_) {
-    HandleFrameData(received_frame_buffer_, frame_length_);
-    frame_position_ = 0;
-  }
+  current_state_ = next_state;
 }
 
 
@@ -74,12 +99,6 @@ void TrxSubNetwork::ParseByteData(uint8_t data) {
 void TrxSubNetwork::FrameEncodeToHdlcAndSend(const uint8_t* frame_buffer,
                                              uint8_t frame_length) {
 
-  // Just double check and make sure that function gets correct data.
-  if (frame_buffer == nullptr || frame_length != FRAME_LENGTH) {
-    std::cout << "Not correct data is provided to encode to HDLC frame format.\n";
-    return;
-  }
-
   uint8_t data = 0;
 
   SendByte((uint8_t)FRAME_BOUNDARY_FLAG);
@@ -87,7 +106,7 @@ void TrxSubNetwork::FrameEncodeToHdlcAndSend(const uint8_t* frame_buffer,
   while (frame_length) {
     data = *frame_buffer;
     frame_buffer++;
-    if ((data == CONTROL_ESCAPE_OCTET) || (data == FRAME_BOUNDARY_FLAG)) {
+    if (data == CONTROL_ESCAPE_OCTET || data == FRAME_BOUNDARY_FLAG) {
       SendByte((uint8_t)CONTROL_ESCAPE_OCTET);
       data ^= (uint8_t)INVERT_OCTET;
     }
@@ -95,19 +114,19 @@ void TrxSubNetwork::FrameEncodeToHdlcAndSend(const uint8_t* frame_buffer,
     SendByte(data);
     frame_length--;
   }
-
-  if ((data == CONTROL_ESCAPE_OCTET) || (data == FRAME_BOUNDARY_FLAG)) {
+/*
+  if (data == CONTROL_ESCAPE_OCTET || data == FRAME_BOUNDARY_FLAG) {
     SendByte((uint8_t)CONTROL_ESCAPE_OCTET);
     data ^= (uint8_t)INVERT_OCTET;
   }
   SendByte(data);
 
-  if ((data == CONTROL_ESCAPE_OCTET) || (data == FRAME_BOUNDARY_FLAG)) {
+  if (data == CONTROL_ESCAPE_OCTET || data == FRAME_BOUNDARY_FLAG) {
     SendByte((uint8_t)CONTROL_ESCAPE_OCTET);
     data ^= (uint8_t)INVERT_OCTET;
   }
-
   SendByte(data);
+*/
   SendByte((uint8_t)FRAME_BOUNDARY_FLAG);
 }
 
@@ -187,8 +206,8 @@ void TrxSubNetwork::Distribute() {
     return;
   }
 
-  uint8_t* data = new uint8_t[FRAME_LENGTH];
-  std::memset(data, 0, FRAME_LENGTH);
+  uint8_t* data = new uint8_t[MAX_FRAME_LENGTH];
+  std::memset(data, 0, MAX_FRAME_LENGTH);
 
   unsigned int idx = 0;
   char byte = 0;
@@ -196,11 +215,11 @@ void TrxSubNetwork::Distribute() {
     try {
       idx = 0;
       byte = 0;
-      while (input_file >> byte && idx < FRAME_LENGTH) {
+      while (input_file >> byte && idx < MAX_FRAME_LENGTH) {
         data[idx++] = (uint8_t)byte;
       }
 
-      FrameEncodeToHdlcAndSend(data, FRAME_LENGTH);
+      FrameEncodeToHdlcAndSend(data, MAX_FRAME_LENGTH);
 
     } catch (const std::exception &e) {
       std::cout << "Data sending error: " << e.what() << "\n";

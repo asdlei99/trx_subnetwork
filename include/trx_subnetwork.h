@@ -18,20 +18,25 @@ using namespace LibSerial;
 // followed by the original data octet with bit 5 inverted.
 #define INVERT_OCTET 0x20
 
-// 16 bit low and high bytes copier.
-#define low(x)  ((x) & 0xFF)
-#define high(x) (((x)>>8) & 0xFF)
+// Maximum length of frame in bytes.
+#define MAX_FRAME_LENGTH 4
 
-// Length of frame in bytes.
-#define FRAME_LENGTH 4
+
+// Enum class represents HDLC finite state machine for parsing received data.
+enum class HdlcState {
+  START = 0,
+  FRAME = 1,
+  ESCAPE = 2
+};
 
 
 struct TrxSubNetwork {
 
-  bool escape_character_;
   uint16_t frame_position_;
   uint16_t frame_length_;
   uint8_t* received_frame_buffer_;
+
+  HdlcState current_state_;
 
   // Note that currently we use serial port communication between two TRX
   // machines, later is has to be VHF based communication.
@@ -42,15 +47,15 @@ struct TrxSubNetwork {
   //
   // Arguments:
   // - frame_length: Frame length in bytes, note that in both side it has to
-  //                 be the same. By default it is set value of FRAME_LENGTH.
+  //                 be the same. By default it is set value of MAX_FRAME_LENGTH.
   //
   // - baud_rate: Serial port speed (baud rate). By default it is set 115200.
-  TrxSubNetwork(const uint16_t frame_length = FRAME_LENGTH,
+  TrxSubNetwork(const uint16_t frame_length = MAX_FRAME_LENGTH,
                 const int baud_rate = 115200) :
-      escape_character_(false),
       frame_position_(0),
       frame_length_(frame_length),
-      received_frame_buffer_(new uint8_t[frame_length_ + 1]) {
+      received_frame_buffer_(new uint8_t[frame_length_ + 1]),
+      current_state_(HdlcState::START) {
 
         // Instantiate a SerialStream object.
         SetupSerialPort(serial_stream, baud_rate);
