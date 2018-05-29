@@ -8,7 +8,7 @@ int main() {
 
   /* TODO Uncomment once project will be released in order to run it as a daemon.
   // Process ID. Create child process.
-  pid_t pid = fork();
+  const pid_t pid = fork();
   if (pid < 0) {
     std::cerr << "fork failed!\n";
     exit(EXIT_FAILURE);
@@ -21,12 +21,10 @@ int main() {
   }
 
   // Create a new SID (Session ID) for the child process.
-  pid_t sid = setsid();
+  const pid_t sid = setsid();
   if (sid < 0) {
     exit(EXIT_FAILURE);
   }
-
-  IrtHDLC hdlc(FRAME_LENGTH);
   */
 
   TrxSubNetwork trx_subnetwork;

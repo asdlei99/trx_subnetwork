@@ -194,7 +194,6 @@ void TrxSubNetwork::Distribute() {
   char byte = 0;
   while (true) {
     try {
-
       idx = 0;
       byte = 0;
       while (input_file >> byte && idx < FRAME_LENGTH) {
