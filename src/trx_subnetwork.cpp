@@ -45,7 +45,7 @@ void TrxSubNetwork::ParseByteData(uint8_t data) {
 
     case HdlcState::FRAME:
          if (data != FRAME_BOUNDARY_FLAG && data != CONTROL_ESCAPE_OCTET) {
-           if (frame_position_ < MAX_FRAME_LENGTH) {
+           if (frame_position_ <= MAX_FRAME_LENGTH) {
              received_frame_buffer_[frame_position_] = data;
              frame_position_++;
              next_state = HdlcState::FRAME;
@@ -54,7 +54,7 @@ void TrxSubNetwork::ParseByteData(uint8_t data) {
              next_state = HdlcState::START;
            }
          } else if (data == FRAME_BOUNDARY_FLAG) {
-           if (frame_position_ < MAX_FRAME_LENGTH && frame_position_ > 0) {
+           if (frame_position_ <= MAX_FRAME_LENGTH && frame_position_ > 0) {
              HandleFrameData(received_frame_buffer_, frame_position_);
            }
            frame_position_ = 0;
@@ -67,7 +67,7 @@ void TrxSubNetwork::ParseByteData(uint8_t data) {
     case HdlcState::ESCAPE:
          data ^= INVERT_OCTET;
          if (data == CONTROL_ESCAPE_OCTET || data == FRAME_BOUNDARY_FLAG) {
-           if (frame_position_ < MAX_FRAME_LENGTH) {
+           if (frame_position_ <= MAX_FRAME_LENGTH) {
              received_frame_buffer_[frame_position_] = data;
              frame_position_++;
              next_state = HdlcState::FRAME;
@@ -114,19 +114,7 @@ void TrxSubNetwork::FrameEncodeToHdlcAndSend(const uint8_t* frame_buffer,
     SendByte(data);
     frame_length--;
   }
-/*
-  if (data == CONTROL_ESCAPE_OCTET || data == FRAME_BOUNDARY_FLAG) {
-    SendByte((uint8_t)CONTROL_ESCAPE_OCTET);
-    data ^= (uint8_t)INVERT_OCTET;
-  }
-  SendByte(data);
 
-  if (data == CONTROL_ESCAPE_OCTET || data == FRAME_BOUNDARY_FLAG) {
-    SendByte((uint8_t)CONTROL_ESCAPE_OCTET);
-    data ^= (uint8_t)INVERT_OCTET;
-  }
-  SendByte(data);
-*/
   SendByte((uint8_t)FRAME_BOUNDARY_FLAG);
 }
 
@@ -154,7 +142,7 @@ void TrxSubNetwork::HandleFrameData(const uint8_t* frame_data,
 
 
 
-// Network device allocation.
+// Network device ("/dev/net/tun") allocation.
 //
 // Arguments:
 // - dev: It should be the name of the device with a format string. (e.g. "tun%d").

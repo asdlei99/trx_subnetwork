@@ -97,7 +97,7 @@ struct TrxSubNetwork {
   // - frame_length: A length of frame.
   void HandleFrameData(const uint8_t* frame_data, const uint16_t frame_length);
 
-  // Network device allocation.
+  // Network device ("/dev/net/tun") allocation.
   //
   // Arguments:
   // - dev: It should be the name of the device with a format string. (e.g. "tun%d").
