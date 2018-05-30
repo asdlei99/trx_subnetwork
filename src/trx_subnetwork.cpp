@@ -101,7 +101,7 @@ void TrxSubNetwork::ParseByteData(uint8_t data) {
 // - frame_buffer: Frame data or original frame.
 // - frame_length: Frame length in bytes.
 void TrxSubNetwork::FrameEncodeToHdlcAndSend(const uint8_t* frame_buffer,
-                                             uint8_t frame_length) {
+                                             uint32_t frame_length) {
 
   uint8_t data = 0;
 
@@ -130,18 +130,14 @@ void TrxSubNetwork::FrameEncodeToHdlcAndSend(const uint8_t* frame_buffer,
 // - frame_data: Received frame data.
 // - frame_length: A length of frame.
 void TrxSubNetwork::HandleFrameData(const uint8_t* frame_data,
-                                    const uint16_t frame_length) {
+                                    const uint32_t frame_length) {
 
   if (frame_data != nullptr && frame_length > 0) {
-    // TODO write data to TUN /dev/net/tun
-    char byte = 0;
-    std::cout << "Received data: ";
-    for (int i = 0; i < frame_length; i++) {
-      byte = (char)frame_data[i];
-      std::cout << byte;
+    ssize_t bytes_write = write(tun_fd_, frame_data, frame_length);
+    if (bytes_write < 0) {
+      std::cerr << "An error occurred in the TUN write.\n";
     }
   }
-  std::cout << "\n";
 }
 
 
@@ -208,30 +204,18 @@ void TrxSubNetwork::Listen() {
 // through serial port by using FrameEncodeToHdlcAndSend() function.
 void TrxSubNetwork::Distribute() {
 
-  // TODO For now we just read data from file and send it, later I should
-  // read data from /dev/net/tun
-  std::ifstream input_file("file.txt");
-  // Determine if the input file argument is valid to read data from.
-  if (!input_file.good()) {
-    std::cerr << "Error: Could not open file for reading.\n";
-    return;
-  }
+  uint8_t* buffer = new uint8_t[MAX_FRAME_LENGTH];
+  std::memset(buffer, 0, MAX_FRAME_LENGTH);
 
-  uint8_t* data = new uint8_t[MAX_FRAME_LENGTH];
-  std::memset(data, 0, MAX_FRAME_LENGTH);
-
-  unsigned int idx = 0;
-  char byte = 0;
+  ssize_t bytes_read = -1;
   while (true) {
     try {
-      idx = 0;
-      byte = 0;
-      while (input_file >> byte && idx < MAX_FRAME_LENGTH) {
-        data[idx++] = (uint8_t)byte;
+      bytes_read = read(tun_fd_, buffer, sizeof(buffer));
+      if (bytes_read >= 0) {
+        FrameEncodeToHdlcAndSend(buffer, bytes_read);
+      } else {
+        std::cerr << "An error occurred in the TUN read.\n";
       }
-
-      FrameEncodeToHdlcAndSend(data, MAX_FRAME_LENGTH);
-
     } catch (const std::exception &e) {
       std::cout << "Data sending error: " << e.what() << "\n";
     }

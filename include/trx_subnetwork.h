@@ -23,7 +23,7 @@ using namespace LibSerial;
 #define INVERT_OCTET 0x20
 
 // Maximum length of frame in bytes.
-#define MAX_FRAME_LENGTH 4
+#define MAX_FRAME_LENGTH 2048
 
 
 // Enum class represents HDLC finite state machine for parsing received data.
@@ -109,14 +109,14 @@ struct TrxSubNetwork {
   // Arguments:
   // - frame_buffer: Frame data or original frame.
   // - frame_length: Frame length in bytes.
-  void FrameEncodeToHdlcAndSend(const uint8_t* frame_buffer, uint8_t frame_length);
+  void FrameEncodeToHdlcAndSend(const uint8_t* frame_buffer, uint32_t frame_length);
 
   // Function processes received frame, basically writes data to to TUN /dev/net/tun
   //
   // Arguments:
   // - frame_data: Received frame data.
   // - frame_length: A length of frame.
-  void HandleFrameData(const uint8_t* frame_data, const uint16_t frame_length);
+  void HandleFrameData(const uint8_t* frame_data, const uint32_t frame_length);
 
   // Network device ("/dev/net/tun") allocation.
   //
