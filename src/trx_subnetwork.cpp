@@ -15,12 +15,11 @@
 //
 // Arguments:
 // - data: A data which will be sent.
-void TrxSubNetwork::SendByte(const uint8_t data) {
+void TrxSubNetwork::SendByte(char data) {
   // TODO Note that currently I keep temporary variable in order to convert and
   // pass to write function for now this is OK. As soon as we change serial port
   // to VHF we should modify current function.
-  const char byte = (char)data;
-  serial_stream.write(&byte, 1);
+  serial_stream.write(&data, 1);
 
   // Wait until the data has actually been transmitted.
   serial_stream.DrainWriteBuffer();
@@ -37,14 +36,10 @@ void TrxSubNetwork::SendByte(const uint8_t data) {
 // - data: Received byte data from serial port.
 void TrxSubNetwork::ParseByteData(uint8_t data) {
 
-  HdlcState next_state = HdlcState::START;
-
   switch (current_state_) {
     case HdlcState::START:
          if (data == FRAME_BOUNDARY_FLAG)
-           next_state = HdlcState::FRAME;
-         else
-           next_state = HdlcState::START;
+           current_state_ = HdlcState::FRAME;
     break;
 
     case HdlcState::FRAME:
@@ -52,19 +47,19 @@ void TrxSubNetwork::ParseByteData(uint8_t data) {
            if (frame_position_ <= MAX_FRAME_LENGTH) {
              received_frame_buffer_[frame_position_] = data;
              frame_position_++;
-             next_state = HdlcState::FRAME;
            } else {
+             std::cerr << "Receive packet is larger than the buffer size\n";
              frame_position_ = 0;
-             next_state = HdlcState::START;
+             current_state_ = HdlcState::START;
            }
          } else if (data == FRAME_BOUNDARY_FLAG) {
            if (frame_position_ <= MAX_FRAME_LENGTH && frame_position_ > 0) {
              HandleFrameData(received_frame_buffer_, frame_position_);
            }
            frame_position_ = 0;
-           next_state = HdlcState::START;
+           current_state_ = HdlcState::START;
          } else if (data == CONTROL_ESCAPE_OCTET) {
-           next_state = HdlcState::ESCAPE;
+           current_state_ = HdlcState::ESCAPE;
          }
     break;
 
@@ -74,22 +69,21 @@ void TrxSubNetwork::ParseByteData(uint8_t data) {
            if (frame_position_ <= MAX_FRAME_LENGTH) {
              received_frame_buffer_[frame_position_] = data;
              frame_position_++;
-             next_state = HdlcState::FRAME;
+             current_state_ = HdlcState::FRAME;
            } else {
+             std::cerr << "Receive packet is larger than the buffer size\n";
              frame_position_ = 0;
-             next_state = HdlcState::START;
+             current_state_ = HdlcState::START;
            }
          } else {
            frame_position_ = 0;
-           next_state = HdlcState::START;
+           current_state_ = HdlcState::START;
          }
     break;
 
     default:
       current_state_ = HdlcState::START;
   }
-
-  current_state_ = next_state;
 }
 
 
@@ -105,13 +99,13 @@ void TrxSubNetwork::FrameEncodeToHdlcAndSend(const uint8_t* frame_buffer,
 
   uint8_t data = 0;
 
-  SendByte((uint8_t)FRAME_BOUNDARY_FLAG);
+  SendByte((char)FRAME_BOUNDARY_FLAG);
 
   while (frame_length) {
     data = *frame_buffer;
     frame_buffer++;
     if (data == CONTROL_ESCAPE_OCTET || data == FRAME_BOUNDARY_FLAG) {
-      SendByte((uint8_t)CONTROL_ESCAPE_OCTET);
+      SendByte((char)CONTROL_ESCAPE_OCTET);
       data ^= (uint8_t)INVERT_OCTET;
     }
 
@@ -119,7 +113,7 @@ void TrxSubNetwork::FrameEncodeToHdlcAndSend(const uint8_t* frame_buffer,
     frame_length--;
   }
 
-  SendByte((uint8_t)FRAME_BOUNDARY_FLAG);
+  SendByte((char)FRAME_BOUNDARY_FLAG);
 }
 
 
@@ -165,8 +159,11 @@ int TrxSubNetwork::TunAlloc(char* dev) {
   std::strncpy(ifr.ifr_name, dev, IFNAMSIZ);
 
   int code = ioctl(fd, TUNSETIFF, (void*)&ifr);
-  if (code < 0)
+  if (code < 0) {
+    std::cout << std::strerror(errno) << "\n";
+    close(fd);
     return code;
+  }
 
   std::strncpy(dev, ifr.ifr_name, IFNAMSIZ);
 
@@ -177,7 +174,7 @@ int TrxSubNetwork::TunAlloc(char* dev) {
 
 // Function is running as a separate thread of process and it is always listening
 // serial port, any received data passes to ParseByteData() function.
-void TrxSubNetwork::Listen() {
+void TrxSubNetwork::Send() {
   // Variable to store data coming from the serial port.
   char data_byte;
 
@@ -202,7 +199,7 @@ void TrxSubNetwork::Listen() {
 // Function is running as a separate thread of process and it is always reading
 // data from TUN /dev/net/tun, then encodes data to HDLC format frame, sends data
 // through serial port by using FrameEncodeToHdlcAndSend() function.
-void TrxSubNetwork::Distribute() {
+void TrxSubNetwork::Receive() {
 
   uint8_t* buffer = new uint8_t[MAX_FRAME_LENGTH];
   std::memset(buffer, 0, MAX_FRAME_LENGTH);
@@ -230,8 +227,8 @@ void TrxSubNetwork::Distribute() {
 // threads or asynchronous.
 void TrxSubNetwork::Run() {
 
-  std::thread listen_thread(&Listen, this);
-  std::thread distribute_thread(&Distribute, this);
+  std::thread listen_thread(&Send, this);
+  std::thread distribute_thread(&Receive, this);
 
   listen_thread.join();
   distribute_thread.join();

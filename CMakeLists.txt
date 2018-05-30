@@ -3,7 +3,7 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 include_directories(include)
 
 set(IRT_PROJECT_SRC
-    src/irt_serial_port.cpp
+    src/serial_port.cpp
     src/trx_subnetwork.cpp
 )
 

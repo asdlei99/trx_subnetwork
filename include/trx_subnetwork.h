@@ -7,37 +7,37 @@
 #include <cstdlib>
 #include <iostream>
 
-#include "irt_serial_port.h"
+#include "serial_port.h"
 #include <SerialStream.h>
 using namespace LibSerial;
 
-// The frame boundary flag '~' (7E in hexadecimal) marks as a beginning
-// and end of frame.
+// The frame boundary flag '~' (7E in hexadecimal) marks the beginning and
+// end of a frame.
 #define FRAME_BOUNDARY_FLAG 0x7E
 
 // A "control escape octet" flag '}' (7D in hexadecimal).
 #define CONTROL_ESCAPE_OCTET 0x7D
 
-// If either of these two octets appears in the transmitted data, an escape octet is sent,
-// followed by the original data octet with bit 5 inverted.
+// If either of the above two octets appear in the transmitted data, an escape
+// octet is sent, followed by the original data octet with bit 5 inverted.
 #define INVERT_OCTET 0x20
 
 // Maximum length of frame in bytes.
 #define MAX_FRAME_LENGTH 2048
 
 
-// Enum class represents HDLC finite state machine for parsing received data.
+// Enum class represents HDLC finite state machine's states for parsing
+// received data.
 enum class HdlcState {
   START = 0,
-  FRAME = 1,
-  ESCAPE = 2
+  FRAME,
+  ESCAPE
 };
 
 
 struct TrxSubNetwork {
 
-  uint16_t frame_position_;
-  uint16_t frame_length_;
+  uint32_t frame_position_;
   uint8_t* received_frame_buffer_;
 
   HdlcState current_state_;
@@ -59,15 +59,19 @@ struct TrxSubNetwork {
   //
   // - baud_rate: Serial port speed (baud rate). By default it is set 115200.
   // - tun_dev: TUN device name, by default it is set 'tun0'.
-  TrxSubNetwork(const uint16_t frame_length = MAX_FRAME_LENGTH,
-                const int baud_rate = 115200, const char* input_tun_dev = "tun0") :
+  TrxSubNetwork(const uint16_t frame_size = MAX_FRAME_LENGTH,
+                const int baud_rate = 115200, const char* input_tun_dev = "/dev/net/tun0") :
       frame_position_(0),
-      frame_length_(frame_length),
-      received_frame_buffer_(new uint8_t[frame_length_ + 1]),
+      received_frame_buffer_(new uint8_t[frame_size + 1]),
       current_state_(HdlcState::START) {
 
         // Instantiate a SerialStream object.
-        SetupSerialPort(serial_stream, baud_rate);
+        bool is_serial_set = SetupSerialPort(serial_stream, baud_rate);
+        if (!is_serial_set) {
+          delete[] received_frame_buffer_;
+          std::cerr << "Failed to setup serial port.\n";
+          std::exit(EXIT_FAILURE);
+        }
 
         // Setup TUN interface.
         tun_dev_ = new char[IFNAMSIZ + 1];
@@ -101,7 +105,7 @@ struct TrxSubNetwork {
   //
   // Arguments:
   // - data: A data which will be sent.
-  void SendByte(const uint8_t data);
+  void SendByte(char data);
 
   // Function gets as an input frame data, encodes it to HDLC frame format and
   // sends it out byte at a time using SendByte() function.
@@ -130,12 +134,12 @@ struct TrxSubNetwork {
 
   // Function is running as a separate thread of process and it is always listening
   // serial port, any received data passes to ParseByteData() function.
-  void Listen();
+  void Send();
 
   // Function is running as a separate thread of process and it is always reading
   // data from TUN /dev/net/tun, then encodes data to HDLC format frame, sends data
   // through serial port by using FrameEncodeToHdlcAndSend() function.
-  void Distribute();
+  void Receive();
 
   // The main function which runs Listen() and Distribute() functions as a separate
   // threads or asynchronous.
