@@ -1,7 +1,11 @@
 #ifndef TRX_SUB_NETWORK_H
 #define TRX_SUB_NETWORK_H
 
-#include <stdint.h>
+#include <cstdint>
+#include <cstring>
+#include <net/if.h>
+#include <cstdlib>
+#include <iostream>
 
 #include "irt_serial_port.h"
 #include <SerialStream.h>
@@ -42,6 +46,10 @@ struct TrxSubNetwork {
   // machines, later is has to be VHF based communication.
   SerialStream serial_stream;
 
+  // TUN file descriptor and device name.
+  int tun_fd_;
+  char* tun_dev_;
+
 
   // Constructor.
   //
@@ -50,8 +58,9 @@ struct TrxSubNetwork {
   //                 be the same. By default it is set value of MAX_FRAME_LENGTH.
   //
   // - baud_rate: Serial port speed (baud rate). By default it is set 115200.
+  // - tun_dev: TUN device name, by default it is set 'tun0'.
   TrxSubNetwork(const uint16_t frame_length = MAX_FRAME_LENGTH,
-                const int baud_rate = 115200) :
+                const int baud_rate = 115200, const char* input_tun_dev = "tun0") :
       frame_position_(0),
       frame_length_(frame_length),
       received_frame_buffer_(new uint8_t[frame_length_ + 1]),
@@ -59,11 +68,23 @@ struct TrxSubNetwork {
 
         // Instantiate a SerialStream object.
         SetupSerialPort(serial_stream, baud_rate);
+
+        // Setup TUN interface.
+        tun_dev_ = new char[IFNAMSIZ + 1];
+        std::strcpy(tun_dev_, input_tun_dev);
+        tun_fd_ = TunAlloc(tun_dev_);
+        if (tun_fd_ < 0) {
+          delete[] tun_dev_;
+          delete[] received_frame_buffer_;
+          std::cerr << "Failed to create TUN interface.\n";
+          std::exit(EXIT_FAILURE);
+        }
     };
 
 
   // Destructor.
   ~TrxSubNetwork() {
+    delete[] tun_dev_;
     delete[] received_frame_buffer_;
   }
 

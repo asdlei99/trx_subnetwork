@@ -5,7 +5,11 @@
 #include <cstring>
 #include <chrono>
 #include <thread>
-
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <linux/if_tun.h>
 
 // Function send a byte data through serial port.
 //
@@ -151,7 +155,26 @@ void TrxSubNetwork::HandleFrameData(const uint8_t* frame_data,
 //
 // Return the file descriptor of the new tun device.
 int TrxSubNetwork::TunAlloc(char* dev) {
-  return 0;
+  if (dev == NULL)
+    return -1;
+
+  int fd = open("/dev/net/tun", O_RDWR);
+  if (fd < 0)
+    return fd;
+
+  struct ifreq ifr;
+  std::memset(&ifr, 0, sizeof(ifr));
+
+  ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
+  std::strncpy(ifr.ifr_name, dev, IFNAMSIZ);
+
+  int code = ioctl(fd, TUNSETIFF, (void*)&ifr);
+  if (code < 0)
+    return code;
+
+  std::strncpy(dev, ifr.ifr_name, IFNAMSIZ);
+
+  return fd;
 }
 
 
