@@ -60,7 +60,7 @@ struct TrxSubNetwork {
   // - baud_rate: Serial port speed (baud rate). By default it is set 115200.
   // - tun_dev: TUN device name, by default it is set 'tun0'.
   TrxSubNetwork(const uint16_t frame_size = MAX_FRAME_LENGTH,
-                const int baud_rate = 115200, const char* input_tun_dev = "/dev/net/tun0") :
+                const int baud_rate = 115200, const char* input_tun_dev = "tun0") :
       frame_position_(0),
       received_frame_buffer_(new uint8_t[frame_size + 1]),
       current_state_(HdlcState::START) {
