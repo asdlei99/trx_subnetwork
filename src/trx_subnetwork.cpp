@@ -18,9 +18,6 @@ void TrxSubNetwork::SendByte(char data) {
   // pass to write function for now this is OK. As soon as we change serial port
   // to VHF we should modify current function.
   serial_stream.write(&data, 1);
-
-  // Wait until the data has actually been transmitted.
-  serial_stream.DrainWriteBuffer();
 }
 
 
@@ -217,8 +214,6 @@ void TrxSubNetwork::Send() {
     } catch (const std::exception &e) {
       std::cout << "Network listening error: " << e.what() << "\n";
     }
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 }
 
@@ -235,7 +230,7 @@ void TrxSubNetwork::Receive() {
   ssize_t bytes_read = -1;
   while (true) {
     try {
-      bytes_read = SafeRead(tun_fd_, buffer, sizeof(buffer));
+      bytes_read = SafeRead(tun_fd_, buffer, MAX_FRAME_LENGTH);
       if (bytes_read >= 0) {
         FrameEncodeToHdlcAndSend(buffer, bytes_read);
       } else {
@@ -244,8 +239,6 @@ void TrxSubNetwork::Receive() {
     } catch (const std::exception &e) {
       std::cout << "Data sending error: " << e.what() << "\n";
     }
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000 * 4));
   }
 }
 
