@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <net/if.h>
+#include <unistd.h>
 #include <cstdlib>
 #include <iostream>
 
@@ -29,7 +30,7 @@ using namespace LibSerial;
 // Enum class represents HDLC finite state machine's states for parsing
 // received data.
 enum class HdlcState {
-  START = 0,
+  START,
   FRAME,
   ESCAPE
 };
@@ -59,10 +60,10 @@ struct TrxSubNetwork {
   //
   // - baud_rate: Serial port speed (baud rate). By default it is set 115200.
   // - tun_dev: TUN device name, by default it is set 'tun0'.
-  TrxSubNetwork(const uint16_t frame_size = MAX_FRAME_LENGTH,
+  TrxSubNetwork(const std::size_t max_frame_length = MAX_FRAME_LENGTH,
                 const int baud_rate = 115200, const char* input_tun_dev = "tun0") :
       frame_position_(0),
-      received_frame_buffer_(new uint8_t[frame_size + 1]),
+      received_frame_buffer_(new uint8_t[max_frame_length + 1]),
       current_state_(HdlcState::START) {
 
         // Instantiate a SerialStream object.
@@ -90,6 +91,8 @@ struct TrxSubNetwork {
   ~TrxSubNetwork() {
     delete[] tun_dev_;
     delete[] received_frame_buffer_;
+    if (tun_fd_ > 0)
+      close(tun_fd_);
   }
 
   // Function finds valid HDLC frame from incoming data.
@@ -113,14 +116,18 @@ struct TrxSubNetwork {
   // Arguments:
   // - frame_buffer: Frame data or original frame.
   // - frame_length: Frame length in bytes.
-  void FrameEncodeToHdlcAndSend(const uint8_t* frame_buffer, uint32_t frame_length);
+  void FrameEncodeToHdlcAndSend(const uint8_t* frame_buffer, std::size_t frame_length);
+
+
+  ssize_t SafeRead(int fd, void* buffer, std::size_t size);
+  ssize_t SafeWrite(int fd, const void* buffer, std::size_t size);
 
   // Function processes received frame, basically writes data to to TUN /dev/net/tun
   //
   // Arguments:
   // - frame_data: Received frame data.
   // - frame_length: A length of frame.
-  void HandleFrameData(const uint8_t* frame_data, const uint32_t frame_length);
+  void HandleFrameData(const uint8_t* frame_data, const std::size_t frame_length);
 
   // Network device ("/dev/net/tun") allocation.
   //

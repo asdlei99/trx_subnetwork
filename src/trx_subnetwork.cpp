@@ -6,9 +6,7 @@
 #include <chrono>
 #include <thread>
 #include <fcntl.h>
-#include <unistd.h>
 #include <sys/ioctl.h>
-#include <net/if.h>
 #include <linux/if_tun.h>
 
 // Function send a byte data through serial port.
@@ -95,7 +93,7 @@ void TrxSubNetwork::ParseByteData(uint8_t data) {
 // - frame_buffer: Frame data or original frame.
 // - frame_length: Frame length in bytes.
 void TrxSubNetwork::FrameEncodeToHdlcAndSend(const uint8_t* frame_buffer,
-                                             uint32_t frame_length) {
+                                             std::size_t frame_length) {
 
   uint8_t data = 0;
 
@@ -118,17 +116,37 @@ void TrxSubNetwork::FrameEncodeToHdlcAndSend(const uint8_t* frame_buffer,
 
 
 
+ssize_t TrxSubNetwork::SafeRead(int fd, void* buffer, std::size_t size) {
+  ssize_t rc;
+  do {
+      rc = read(fd, buffer, size);
+  } while (rc < 0 && errno == EINTR);
+
+  return rc;
+}
+
+ssize_t TrxSubNetwork::SafeWrite(int fd, const void* buffer, std::size_t size) {
+  ssize_t wc;
+  do {
+       wc = write(fd, buffer, size);
+  } while (wc < 0 && errno == EINTR && wc != (ssize_t)size);
+
+  return wc;
+}
+
+
+
 // Function processes received frame, basically writes data to to TUN /dev/net/tun
 //
 // Arguments:
 // - frame_data: Received frame data.
 // - frame_length: A length of frame.
 void TrxSubNetwork::HandleFrameData(const uint8_t* frame_data,
-                                    const uint32_t frame_length) {
+                                    const std::size_t frame_length) {
 
   if (frame_data != nullptr && frame_length > 0) {
-    ssize_t bytes_write = write(tun_fd_, frame_data, frame_length);
-    if (bytes_write < 0) {
+    ssize_t bytes_written = SafeWrite(tun_fd_, frame_data, frame_length);
+    if (bytes_written < 0) {
       std::cerr << "An error occurred in the TUN write.\n";
     }
   }
@@ -207,7 +225,7 @@ void TrxSubNetwork::Receive() {
   ssize_t bytes_read = -1;
   while (true) {
     try {
-      bytes_read = read(tun_fd_, buffer, sizeof(buffer));
+      bytes_read = SafeRead(tun_fd_, buffer, sizeof(buffer));
       if (bytes_read >= 0) {
         FrameEncodeToHdlcAndSend(buffer, bytes_read);
       } else {
