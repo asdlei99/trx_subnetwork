@@ -56,13 +56,13 @@ struct TrxSubNetwork {
   // Constructor.
   //
   // Arguments:
+  // - baud_rate: Serial port speed (baud rate). By default it is set 115200.
+  // - input_serial_dev: Serial port device name (e.g. ttyS0). By default it is set ttyS0.
+  // - tun_dev: TUN device name (e.g. tun0). By default it is set tun0.
   // - frame_length: Frame length in bytes, note that in both side it has to
   //                 be the same. By default it is set value of MAX_FRAME_LENGTH.
-  //
-  // - baud_rate: Serial port speed (baud rate). By default it is set 115200.
-  // - tun_dev: TUN device name, by default it is set 'tun0'.
-  TrxSubNetwork(const int baud_rate, std::string input_serial_dev,
-                std::string input_tun_dev,
+  TrxSubNetwork(const int baud_rate = 115200, std::string input_serial_dev = "ttyS0",
+                std::string input_tun_dev = "tun0",
                 const std::size_t max_frame_length = MAX_FRAME_LENGTH) :
 
       frame_position_(0),
