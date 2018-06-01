@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
     input_tun_dev = std::string(argv[3]);
   }
 
-  // TODO Verify/check and see if input values are provided correct.
+  // TODO Verify/check and make sure if input values are provided correct.
 
   /* TODO Uncomment once project will be released in order to run it as a daemon.
   // Process ID. Create child process.
