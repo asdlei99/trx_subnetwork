@@ -126,14 +126,23 @@ ssize_t TrxSubNetwork::SafeRead(int fd, void* buffer, std::size_t size) {
   return rc;
 }
 
-ssize_t TrxSubNetwork::SafeWrite(int fd, const void* buffer, std::size_t size) {
+ssize_t TrxSubNetwork::SafeWrite(int fd, uint8_t* buffer, std::size_t size) {
   ssize_t wc;
-  do {
-       wc = write(fd, buffer, size);
-  } while (wc < 0 && errno == EINTR);
+  ssize_t bytes_written = 0;
 
-  std::cout << "Write to TUN: " << wc << "\n";
-  return wc;
+  while (size > 0) {
+    do {
+         wc = write(fd, buffer, size);
+    } while (wc < 0 && errno == EINTR);
+    if (wc < 0)
+      return -1;
+    size -= wc;
+    buffer += wc;
+    bytes_written += wc;
+  }
+
+  std::cout << "Write to TUN: " << bytes_written << "\n";
+  return bytes_written;
 }
 
 
@@ -143,14 +152,13 @@ ssize_t TrxSubNetwork::SafeWrite(int fd, const void* buffer, std::size_t size) {
 // Arguments:
 // - frame_data: Received frame data.
 // - frame_length: A length of frame.
-void TrxSubNetwork::HandleFrameData(const uint8_t* frame_data,
-                                    const std::size_t frame_length) {
+void TrxSubNetwork::HandleFrameData(uint8_t* frame_data, std::size_t frame_length) {
 
   if (frame_data != nullptr && frame_length > 0) {
-    ssize_t bytes_written;
-    do {
-      bytes_written = SafeWrite(tun_fd_, frame_data, frame_length);
-    } while (bytes_written < 0 && bytes_written != (ssize_t)frame_length);
+    ssize_t bytes_written = SafeWrite(tun_fd_, frame_data, frame_length);
+    if (bytes_written < 0) {
+      std::cerr << "An error occurred in the TUN write.\n";
+    }
   }
 }
 

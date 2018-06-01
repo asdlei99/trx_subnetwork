@@ -120,14 +120,14 @@ struct TrxSubNetwork {
 
 
   ssize_t SafeRead(int fd, void* buffer, std::size_t size);
-  ssize_t SafeWrite(int fd, const void* buffer, std::size_t size);
+  ssize_t SafeWrite(int fd, uint8_t* buffer, std::size_t size);
 
   // Function processes received frame, basically writes data to to TUN /dev/net/tun
   //
   // Arguments:
   // - frame_data: Received frame data.
   // - frame_length: A length of frame.
-  void HandleFrameData(const uint8_t* frame_data, const std::size_t frame_length);
+  void HandleFrameData(uint8_t* frame_data, std::size_t frame_length);
 
   // Network device ("/dev/net/tun") allocation.
   //
