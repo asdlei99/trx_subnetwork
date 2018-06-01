@@ -2,10 +2,12 @@
 
 using namespace LibSerial;
 
-bool SetupSerialPort(SerialStream &serial_stream, const int baud_rate) {
+bool SetupSerialPort(SerialStream &serial_stream,
+                     const int baud_rate,  std::string &input_serial_dev) {
 
   // Open the Serial Port at the desired hardware port.
-  serial_stream.Open("/dev/ttyS0");
+  input_serial_dev = std::string("/dev/") + input_serial_dev;
+  serial_stream.Open(input_serial_dev);
   bool is_speed_set = true;
 
   switch (baud_rate) {

@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <cstdlib>
 #include <iostream>
+#include <string>
 
 #include "serial_port.h"
 #include <SerialStream.h>
@@ -60,14 +61,16 @@ struct TrxSubNetwork {
   //
   // - baud_rate: Serial port speed (baud rate). By default it is set 115200.
   // - tun_dev: TUN device name, by default it is set 'tun0'.
-  TrxSubNetwork(const std::size_t max_frame_length = MAX_FRAME_LENGTH,
-                const int baud_rate = 115200, const char* input_tun_dev = "tun0") :
+  TrxSubNetwork(const int baud_rate, std::string input_serial_dev,
+                std::string input_tun_dev,
+                const std::size_t max_frame_length = MAX_FRAME_LENGTH) :
+
       frame_position_(0),
       received_frame_buffer_(new uint8_t[max_frame_length + 1]),
       current_state_(HdlcState::START) {
 
         // Instantiate a SerialStream object.
-        bool is_serial_set = SetupSerialPort(serial_stream, baud_rate);
+        bool is_serial_set = SetupSerialPort(serial_stream, baud_rate, input_serial_dev);
         if (!is_serial_set) {
           delete[] received_frame_buffer_;
           std::cerr << "Failed to setup serial port.\n";
@@ -76,7 +79,7 @@ struct TrxSubNetwork {
 
         // Setup TUN interface.
         tun_dev_ = new char[IFNAMSIZ + 1];
-        std::strcpy(tun_dev_, input_tun_dev);
+        std::strcpy(tun_dev_, input_tun_dev.c_str());
         tun_fd_ = TunAlloc(tun_dev_);
         if (tun_fd_ < 0) {
           delete[] tun_dev_;
